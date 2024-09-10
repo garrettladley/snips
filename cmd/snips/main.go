@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 
 	"github.com/fatih/color"
 	"github.com/garrettladley/snips"
@@ -75,9 +76,49 @@ const generateUsageText = `usage: snips generate [<args>...]
 Generates syntax highlighted templ components from code snippets.
 
 Args:
+  -path <path>
+  	Generates code for all files in path. (default .)
+  -f <file>
+    Optionally generates code for a single file, e.g. -f header.templ
   -stdout
     Prints to stdout instead of writing generated files to the filesystem.
     Only applicable when -f is used.
+  -watch
+    Set to true to watch the path for changes and regenerate code.
+  -style
+  	Style to use for formatting or path to an XML file to load.
+  -prefix
+  	HTML CSS class prefix
+  -html-styles
+  	Output HTML CSS styles.
+  -all-styles
+  	Output all HTML CSS styles, including redundant ones.
+  -html-only
+  	Output HTML fragment.
+  -inline-styles
+  	Output HTML with inline CSS styles (no classes).
+  -tab-width
+  	Set the HTML tab width. (default 8)
+  -line-numbers
+  	Include line numbers in output.
+  -line-numbers-table
+  	Split line numbers and code in a HTML table.
+  -line-numbers-style
+  	Style for line numbers.
+  -highlight
+  	Highlight these lines. N[:M][,...]
+  -highlight-style
+  	Style used for highlighting lines.
+  -base-line
+  	Base line number. (default 1)
+  -prevent-surrounding-pre
+  	Prevent the surrounding pre tag.
+  -linkable-lines
+  	Make the line numbers linkable and be a link to themselves.
+  -lazy
+    Only generate .go files if the source .templ file is newer.
+  -keep-orphaned-files
+    Keeps orphaned generated templ files. (default false)
   -v
     Set log verbosity level to "debug". (default "info")
   -log-level
@@ -92,9 +133,30 @@ Examples:
 
 func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 	cmd := flag.NewFlagSet("generate", flag.ExitOnError)
+	fileNameFlag := cmd.String("f", "", "")
+	pathFlag := cmd.String("path", ".", "")
 	toStdoutFlag := cmd.Bool("stdout", false, "")
+	watchFlag := cmd.Bool("watch", false, "")
+	styleFlag := cmd.String("style", "swapoff", "")
+	prefixFlag := cmd.String("prefix", "", "")
+	htmlStylesFlag := cmd.Bool("html-styles", false, "")
+	allStylesFlag := cmd.Bool("all-styles", false, "")
+	htmlOnlyFlag := cmd.Bool("html-only", false, "")
+	inlineStylesFlag := cmd.Bool("inline-styles", false, "")
+	tabWidthFlag := cmd.Int("tab-width", 8, "")
+	linesFlag := cmd.Bool("line-numbers", false, "")
+	linesTableFlag := cmd.Bool("line-numbers-table", false, "")
+	linesStyleFlag := cmd.String("line-numbers-style", "", "")
+	highlightFlag := cmd.String("highlight", "", "")
+	highlightStyleFlag := cmd.String("highlight-style", "", "")
+	baseLineFlag := cmd.Int("base-line", 0, "")
+	preventSurroundingPreFlag := cmd.Bool("prevent-surrounding-pre", false, "")
+	linkableLinesFlag := cmd.Bool("linkable-lines", false, "")
+	workerCountFlag := cmd.Int("w", runtime.NumCPU(), "")
 	verboseFlag := cmd.Bool("v", false, "")
 	logLevelFlag := cmd.String("log-level", "info", "")
+	lazyFlag := cmd.Bool("lazy", false, "")
+	keepOrphanedFilesFlag := cmd.Bool("keep-orphaned-files", false, "")
 	helpFlag := cmd.Bool("help", false, "")
 	err := cmd.Parse(args)
 	if err != nil {
@@ -123,7 +185,28 @@ func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 	}
 
 	err = generatecmd.Run(ctx, log, generatecmd.Arguments{
-		FileWriter: fw,
+		FileName:              *fileNameFlag,
+		Path:                  *pathFlag,
+		FileWriter:            fw,
+		Watch:                 *watchFlag,
+		Style:                 *styleFlag,
+		Prefix:                *prefixFlag,
+		Styles:                *htmlStylesFlag,
+		AllStyles:             *allStylesFlag,
+		HTMLOnly:              *htmlOnlyFlag,
+		InlineStyles:          *inlineStylesFlag,
+		TabWidth:              *tabWidthFlag,
+		Lines:                 *linesFlag,
+		LinesTable:            *linesTableFlag,
+		LinesStyle:            *linesStyleFlag,
+		Highlight:             *highlightFlag,
+		HighlightStyle:        *highlightStyleFlag,
+		BaseLine:              *baseLineFlag,
+		PreventSurroundingPre: *preventSurroundingPreFlag,
+		LinkableLines:         *linkableLinesFlag,
+		WorkerCount:           *workerCountFlag,
+		KeepOrphanedFiles:     *keepOrphanedFilesFlag,
+		Lazy:                  *lazyFlag,
 	})
 	if err != nil {
 		color.New(color.FgRed).Fprint(stderr, "(✗) ")
