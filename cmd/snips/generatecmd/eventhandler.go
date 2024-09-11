@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/fsnotify/fsnotify"
 	"github.com/garrettladley/snips/generator"
 )
@@ -36,7 +37,7 @@ func NewFSEventHandler(
 	log *slog.Logger,
 	dir string,
 	devMode bool,
-	genOpts []generator.GenerateOpt,
+	genOpts []html.Option,
 	keepOrphanedFiles bool,
 	fileWriter FileWriterFunc,
 	lazy bool,
@@ -75,7 +76,7 @@ type FSEventHandler struct {
 	fileNameToErrorMutex       *sync.Mutex
 	hashes                     map[string][sha256.Size]byte
 	hashesMutex                *sync.Mutex
-	genOpts                    []generator.GenerateOpt
+	genOpts                    []html.Option
 	genSourceMapVis            bool
 	DevMode                    bool
 	Errors                     []error
@@ -85,24 +86,8 @@ type FSEventHandler struct {
 }
 
 func (h *FSEventHandler) HandleEvent(ctx context.Context, event fsnotify.Event) (goUpdated, textUpdated bool, err error) {
-	// Handle _templ.go files.
-	if !event.Has(fsnotify.Remove) && strings.HasSuffix(event.Name, "_templ.go") {
-		_, err = os.Stat(strings.TrimSuffix(event.Name, "_templ.go") + ".templ")
-		if !os.IsNotExist(err) {
-			return false, false, err
-		}
-		// File is orphaned.
-		if h.keepOrphanedFiles {
-			return false, false, nil
-		}
-		h.Log.Debug("Deleting orphaned Go file", slog.String("file", event.Name))
-		if err = os.Remove(event.Name); err != nil {
-			h.Log.Warn("Failed to remove orphaned file", slog.Any("error", err))
-		}
-		return true, false, nil
-	}
-	// Handle _templ.txt files.
-	if !event.Has(fsnotify.Remove) && strings.HasSuffix(event.Name, "_templ.txt") {
+	// Handle _code.txt files.
+	if !event.Has(fsnotify.Remove) && strings.HasSuffix(event.Name, "_code.txt") {
 		if h.DevMode {
 			// Don't delete the file if we're in dev mode, but mark that text was updated.
 			return false, true, nil
@@ -115,26 +100,21 @@ func (h *FSEventHandler) HandleEvent(ctx context.Context, event fsnotify.Event) 
 		return false, false, nil
 	}
 
-	// Handle .templ files.
-	if !strings.HasSuffix(event.Name, ".templ") {
+	// Handle .code.* files.
+	if !IsCodeFile(event.Name) {
 		return false, false, nil
 	}
 
 	// If the file hasn't been updated since the last time we processed it, ignore it.
-	lastModTime, updatedModTime := h.UpsertLastModTime(event.Name)
+	_, updatedModTime := h.UpsertLastModTime(event.Name)
 	if !updatedModTime {
 		h.Log.Debug("Skipping file because it wasn't updated", slog.String("file", event.Name))
-		return false, false, nil
-	}
-	// If the go file is newer than the templ file, skip generation, because it's up-to-date.
-	if h.lazy && goFileIsUpToDate(event.Name, lastModTime) {
-		h.Log.Debug("Skipping file because the Go file is up-to-date", slog.String("file", event.Name))
 		return false, false, nil
 	}
 
 	// Start a processor.
 	start := time.Now()
-	goUpdated, textUpdated, err = h.generate(ctx, event.Name)
+	goUpdated, textUpdated, err = h.generate(event.Name)
 	if err != nil {
 		h.Log.Error(
 			"Error generating code",
@@ -151,15 +131,6 @@ func (h *FSEventHandler) HandleEvent(ctx context.Context, event fsnotify.Event) 
 	h.Log.Debug("Generated code", slog.String("file", event.Name), slog.Duration("in", time.Since(start)))
 
 	return goUpdated, textUpdated, nil
-}
-
-func goFileIsUpToDate(templFileName string, templFileLastMod time.Time) (upToDate bool) {
-	goFileName := strings.TrimSuffix(templFileName, ".templ") + "_templ.go"
-	goFileInfo, err := os.Stat(goFileName)
-	if err != nil {
-		return false
-	}
-	return goFileInfo.ModTime().After(templFileLastMod)
 }
 
 func (h *FSEventHandler) SetError(fileName string, hasError bool) (previouslyHadError bool, errorCount int) {
@@ -202,8 +173,8 @@ func (h *FSEventHandler) UpsertHash(fileName string, hash [sha256.Size]byte) (up
 
 // generate Go code for a single template.
 // If a basePath is provided, the filename included in error messages is relative to it.
-func (h *FSEventHandler) generate(ctx context.Context, fileName string) (goUpdated, textUpdated bool, err error) {
-	targetFileName := strings.TrimSuffix(fileName, ".templ") + "_templ.go"
+func (h *FSEventHandler) generate(fileName string) (goUpdated, textUpdated bool, err error) {
+	targetFileName := fileName + ".templ"
 
 	// Only use relative filenames to the basepath for filenames in runtime error messages.
 	absFilePath, err := filepath.Abs(fileName)
@@ -218,8 +189,7 @@ func (h *FSEventHandler) generate(ctx context.Context, fileName string) (goUpdat
 	relFilePath = filepath.ToSlash(relFilePath)
 
 	var b bytes.Buffer
-	// append(h.genOpts, generator.WithFileName(relFilePath))...
-	literals, err := generator.Generate(h.genOpts...)
+	literals, err := generator.Generate(&b, h.genOpts, generator.WithFileName(relFilePath))
 	if err != nil {
 		return false, false, fmt.Errorf("%s generation error: %w", fileName, err)
 	}
@@ -240,7 +210,7 @@ func (h *FSEventHandler) generate(ctx context.Context, fileName string) (goUpdat
 
 	// Add the txt file if it has changed.
 	if len(literals) > 0 {
-		txtFileName := strings.TrimSuffix(fileName, ".templ") + "_templ.txt"
+		txtFileName := "_code.txt"
 		txtHash := sha256.Sum256([]byte(literals))
 		if h.UpsertHash(txtFileName, txtHash) {
 			textUpdated = true

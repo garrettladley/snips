@@ -79,7 +79,7 @@ Args:
   -path <path>
   	Generates code for all files in path. (default .)
   -f <file>
-    Optionally generates code for a single file, e.g. -f header.templ
+    Optionally generates code for a single file, e.g. -f snippet.code.go
   -stdout
     Prints to stdout instead of writing generated files to the filesystem.
     Only applicable when -f is used.
@@ -89,8 +89,6 @@ Args:
   	Style to use for formatting or path to an XML file to load.
   -prefix
   	HTML CSS class prefix
-  -html-styles
-  	Output HTML CSS styles.
   -all-styles
   	Output all HTML CSS styles, including redundant ones.
   -html-only
@@ -103,12 +101,8 @@ Args:
   	Include line numbers in output.
   -line-numbers-table
   	Split line numbers and code in a HTML table.
-  -line-numbers-style
-  	Style for line numbers.
   -highlight
   	Highlight these lines. N[:M][,...]
-  -highlight-style
-  	Style used for highlighting lines.
   -base-line
   	Base line number. (default 1)
   -prevent-surrounding-pre
@@ -116,7 +110,7 @@ Args:
   -linkable-lines
   	Make the line numbers linkable and be a link to themselves.
   -lazy
-    Only generate .go files if the source .templ file is newer.
+    Only generate .go files if the source .templ file is newer. // needed?
   -keep-orphaned-files
     Keeps orphaned generated templ files. (default false)
   -v
@@ -139,16 +133,13 @@ func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 	watchFlag := cmd.Bool("watch", false, "")
 	styleFlag := cmd.String("style", "swapoff", "")
 	prefixFlag := cmd.String("prefix", "", "")
-	htmlStylesFlag := cmd.Bool("html-styles", false, "")
 	allStylesFlag := cmd.Bool("all-styles", false, "")
 	htmlOnlyFlag := cmd.Bool("html-only", false, "")
 	inlineStylesFlag := cmd.Bool("inline-styles", false, "")
 	tabWidthFlag := cmd.Int("tab-width", 8, "")
 	linesFlag := cmd.Bool("line-numbers", false, "")
 	linesTableFlag := cmd.Bool("line-numbers-table", false, "")
-	linesStyleFlag := cmd.String("line-numbers-style", "", "")
 	highlightFlag := cmd.String("highlight", "", "")
-	highlightStyleFlag := cmd.String("highlight-style", "", "")
 	baseLineFlag := cmd.Int("base-line", 0, "")
 	preventSurroundingPreFlag := cmd.Bool("prevent-surrounding-pre", false, "")
 	linkableLinesFlag := cmd.Bool("linkable-lines", false, "")
@@ -191,16 +182,13 @@ func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 		Watch:                 *watchFlag,
 		Style:                 *styleFlag,
 		Prefix:                *prefixFlag,
-		Styles:                *htmlStylesFlag,
 		AllStyles:             *allStylesFlag,
 		HTMLOnly:              *htmlOnlyFlag,
 		InlineStyles:          *inlineStylesFlag,
 		TabWidth:              *tabWidthFlag,
 		Lines:                 *linesFlag,
 		LinesTable:            *linesTableFlag,
-		LinesStyle:            *linesStyleFlag,
 		Highlight:             *highlightFlag,
-		HighlightStyle:        *highlightStyleFlag,
 		BaseLine:              *baseLineFlag,
 		PreventSurroundingPre: *preventSurroundingPreFlag,
 		LinkableLines:         *linkableLinesFlag,

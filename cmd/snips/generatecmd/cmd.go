@@ -8,14 +8,16 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/a-h/templ/cmd/templ/generatecmd/watcher"
+	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/fsnotify/fsnotify"
 	"github.com/garrettladley/snips/cmd/snips/generatecmd/modcheck"
-	"github.com/garrettladley/snips/generator"
 )
 
 func NewGenerate(log *slog.Logger, args Arguments) (g *Generate) {
@@ -61,6 +63,41 @@ func (cmd Generate) Run(ctx context.Context) (err error) {
 		}
 	}
 
+	opts := []html.Option{
+		html.TabWidth(cmd.Args.TabWidth),
+		html.BaseLineNumber(cmd.Args.BaseLine),
+		html.ClassPrefix(cmd.Args.Prefix),
+		html.WithAllClasses(cmd.Args.AllStyles),
+		html.WithClasses(!cmd.Args.InlineStyles),
+		html.Standalone(!cmd.Args.HTMLOnly),
+		html.WithLineNumbers(cmd.Args.Lines),
+		html.LineNumbersInTable(cmd.Args.LinesTable),
+		html.PreventSurroundingPre(cmd.Args.PreventSurroundingPre),
+		html.WithLinkableLineNumbers(cmd.Args.LinkableLines, "L"),
+	}
+	if len(cmd.Args.Highlight) > 0 {
+		ranges := [][2]int{}
+		for _, span := range strings.Split(cmd.Args.Highlight, ",") {
+			parts := strings.Split(span, ":")
+			if len(parts) > 2 {
+				return fmt.Errorf("range should be N[:M], not %q", span)
+			}
+			start, err := strconv.ParseInt(parts[0], 10, 64)
+			if err != nil {
+				return fmt.Errorf("min value of range should be integer not %q", parts[0])
+			}
+			end := start
+			if len(parts) == 2 {
+				end, err = strconv.ParseInt(parts[1], 10, 64)
+				if err != nil {
+					return fmt.Errorf("max value of range should be integer not %q", parts[1])
+				}
+			}
+			ranges = append(ranges, [2]int{int(start), int(end)})
+		}
+		opts = append(opts, html.HighlightLines(ranges))
+	}
+
 	// Check the version of the templ module.
 	if err := modcheck.Check(cmd.Args.Path); err != nil {
 		cmd.Log.Warn("templ version check: " + err.Error())
@@ -70,7 +107,7 @@ func (cmd Generate) Run(ctx context.Context) (err error) {
 		cmd.Log,
 		cmd.Args.Path,
 		cmd.Args.Watch,
-		[]generator.GenerateOpt{},
+		opts,
 		cmd.Args.KeepOrphanedFiles,
 		cmd.Args.FileWriter,
 		cmd.Args.Lazy,
@@ -155,7 +192,7 @@ func (cmd Generate) Run(ctx context.Context) (err error) {
 			cmd.Log,
 			cmd.Args.Path,
 			false, // Force production mode.
-			[]generator.GenerateOpt{},
+			opts,
 			cmd.Args.KeepOrphanedFiles,
 			cmd.Args.FileWriter,
 			cmd.Args.Lazy,
@@ -232,6 +269,8 @@ func (cmd Generate) Run(ctx context.Context) (err error) {
 					timeout.Reset(time.Hour * 24 * 365)
 					break
 				}
+				postGenerationEventsWG.Add(1)
+				postGenerationEventsWG.Done()
 				// Reset timer.
 				timeout.Reset(time.Millisecond * 100)
 				textUpdated = false

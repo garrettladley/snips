@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/garrettladley/snips/cmd/snips/generatecmd"
 )
 
 func Recursive(
@@ -61,20 +63,6 @@ func WalkFiles(ctx context.Context, path string, out chan fsnotify.Event) (err e
 	})
 }
 
-func shouldIncludeFile(name string) bool {
-	// TODO: should be .code.*
-	if strings.HasSuffix(name, ".templ") {
-		return true
-	}
-	if strings.HasSuffix(name, "_templ.go") {
-		return true
-	}
-	if strings.HasSuffix(name, "_templ.txt") {
-		return true
-	}
-	return false
-}
-
 type RecursiveWatcher struct {
 	ctx     context.Context
 	w       *fsnotify.Watcher
@@ -82,6 +70,11 @@ type RecursiveWatcher struct {
 	Errors  chan error
 	timerMu sync.Mutex
 	timers  map[timerKey]*time.Timer
+}
+
+func shouldIncludeFile(name string) bool {
+	fmt.Println(name, generatecmd.IsCodeFile(name))
+	return generatecmd.IsCodeFile(name)
 }
 
 type timerKey struct {
@@ -114,7 +107,7 @@ func (w *RecursiveWatcher) loop() {
 					w.Errors <- err
 				}
 			}
-			// Only notify on templ related files.
+			// Only notify on .code.* related files.
 			if !shouldIncludeFile(event.Name) {
 				continue
 			}

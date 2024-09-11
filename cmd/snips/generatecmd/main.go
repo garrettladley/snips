@@ -15,16 +15,13 @@ type Arguments struct {
 	Watch                 bool
 	Style                 string
 	Prefix                string
-	Styles                bool
 	AllStyles             bool
 	HTMLOnly              bool
 	InlineStyles          bool
 	TabWidth              int
 	Lines                 bool
 	LinesTable            bool
-	LinesStyle            string
 	Highlight             string
-	HighlightStyle        string
 	BaseLine              int
 	PreventSurroundingPre bool
 	LinkableLines         bool
