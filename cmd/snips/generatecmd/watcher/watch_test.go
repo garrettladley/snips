@@ -32,5 +32,4 @@ func TestShouldIncludeFile(t *testing.T) {
 			}
 		})
 	}
-
 }

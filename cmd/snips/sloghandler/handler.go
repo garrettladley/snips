@@ -24,6 +24,7 @@ var levelToIcon = map[slog.Level]string{
 	slog.LevelWarn:  "(!)",
 	slog.LevelError: "(✗)",
 }
+
 var levelToColor = map[slog.Level]*color.Color{
 	slog.LevelDebug: color.New(color.FgCyan),
 	slog.LevelInfo:  color.New(color.FgGreen),
