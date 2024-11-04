@@ -6,6 +6,8 @@ on:
   push:
     paths:
       - '**/*.go'
+      - go.mod
+      - go.sum
       - .github/workflows/ci.yml
 
 concurrency:
