@@ -5,7 +5,7 @@ permissions: read-all
 on:
   push:
     paths:
-      - **/*.go
+      - '**/*.go'
       - .github/workflows/ci.yml
 
 concurrency:
