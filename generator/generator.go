@@ -3,6 +3,7 @@ package generator
 import (
 	"io"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/chroma/v2"
@@ -35,6 +36,15 @@ func WithFileName(name string) GenerateOpt {
 			return nil
 		}
 		g.fileName = name
+		return nil
+	}
+}
+
+func WithExtractStrings() GenerateOpt {
+	return func(g *generator) error {
+		g.w.literalWriter = &watchLiteralWriter{
+			builder: &strings.Builder{},
+		}
 		return nil
 	}
 }

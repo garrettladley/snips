@@ -2,7 +2,6 @@ package watcher
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"os"
 	"path"
@@ -12,7 +11,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/garrettladley/snips/cmd/snips/generatecmd"
+	"github.com/garrettladley/snips"
 )
 
 func Recursive(
@@ -73,8 +72,7 @@ type RecursiveWatcher struct {
 }
 
 func shouldIncludeFile(name string) bool {
-	fmt.Println(name, generatecmd.IsCodeFile(name))
-	return generatecmd.IsCodeFile(name)
+	return snips.ContainsDotCodeDot(name)
 }
 
 type timerKey struct {

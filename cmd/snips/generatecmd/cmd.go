@@ -14,10 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/a-h/templ/cmd/templ/generatecmd/watcher"
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/fsnotify/fsnotify"
 	"github.com/garrettladley/snips/cmd/snips/generatecmd/modcheck"
+	"github.com/garrettladley/snips/cmd/snips/generatecmd/watcher"
 )
 
 func NewGenerate(log *slog.Logger, args Arguments) (g *Generate) {

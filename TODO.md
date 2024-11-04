@@ -1,4 +1,4 @@
-- [ ] Determine package name to be generated
+- [ X ] Determine package name to be generated
 - [ ] Determine language to be used in lexer
 - [ ] Drill down style
 - [ ] Flag for with version

@@ -17,6 +17,7 @@ import (
 
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/fsnotify/fsnotify"
+	"github.com/garrettladley/snips"
 	"github.com/garrettladley/snips/generator"
 )
 
@@ -101,7 +102,7 @@ func (h *FSEventHandler) HandleEvent(ctx context.Context, event fsnotify.Event) 
 	}
 
 	// Handle .code.* files.
-	if !IsCodeFile(event.Name) {
+	if !snips.ContainsDotCodeDot(event.Name) {
 		return false, false, nil
 	}
 
@@ -174,6 +175,9 @@ func (h *FSEventHandler) UpsertHash(fileName string, hash [sha256.Size]byte) (up
 // generate Go code for a single template.
 // If a basePath is provided, the filename included in error messages is relative to it.
 func (h *FSEventHandler) generate(fileName string) (goUpdated, textUpdated bool, err error) {
+	fmt.Println(fileName, snips.PackageName(fileName))
+
+	// remove .code. from the filename
 	targetFileName := fileName + ".templ"
 
 	// Only use relative filenames to the basepath for filenames in runtime error messages.
