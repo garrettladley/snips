@@ -91,7 +91,7 @@ func (g *generator) generate() (err error) {
 	if err = g.writeImports(); err != nil {
 		return
 	}
-	if err = g.writFoo(); err != nil {
+	if err = g.writeComponent(); err != nil {
 		return
 	}
 	if err = g.writeBlankAssignmentForRuntimeImport(); err != nil {
@@ -148,7 +148,7 @@ func (g *generator) writeImports() error {
 	return nil
 }
 
-func (g *generator) writFoo() (err error) {
+func (g *generator) writeComponent() (err error) {
 	if _, err = g.w.Write("func " + g.componentName + "() templ.Component {\n"); err != nil {
 		return
 	}
@@ -257,44 +257,6 @@ func (g *generator) writFoo() (err error) {
 		return
 	}
 	return nil
-}
-
-func (g *generator) writeComponent() (err error) {
-	if _, err = g.w.Write("templ " + g.componentName + "() {\n"); err != nil {
-		return
-	}
-
-	f, err := os.ReadFile(g.og)
-	contents, err := io.ReadAll(bytes.NewReader(f))
-	lexer := lexers.Analyse(string(contents))
-	if lexer == nil {
-		lexer = lexers.Fallback
-	}
-	lexer = chroma.Coalesce(lexer)
-	formatter := html.New(html.PreventSurroundingPre(true), html.InlineCode(true))
-	style := styles.Get("monkokailight")
-	if style == nil {
-		style = styles.Fallback
-	}
-	iterator, err := lexer.Tokenise(nil, string(contents))
-	var b bytes.Buffer
-	err = formatter.Format(&b, style, iterator)
-	if err != nil {
-		return err
-	}
-	// if _, err = g.w.Write("<pre> {`\n" + b.String() + "\n`}</pre>"); err != nil {
-
-	if _, err = g.w.Write(b.String()); err != nil {
-		return err
-	}
-	if _, err = g.w.Write("\n"); err != nil {
-		return err
-	}
-
-	if _, err := g.w.Write("}\n"); err != nil {
-		return err
-	}
-	return err
 }
 
 // writeBlankAssignmentForRuntimeImport writes out a blank identifier assignment.
