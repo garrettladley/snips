@@ -9,25 +9,19 @@ import (
 )
 
 type Arguments struct {
-	FileName              string
-	FileWriter            FileWriterFunc
-	Path                  string
-	Watch                 bool
-	Style                 string
-	Prefix                string
-	AllStyles             bool
-	HTMLOnly              bool
-	InlineStyles          bool
-	TabWidth              int
-	Lines                 bool
-	LinesTable            bool
-	Highlight             string
-	BaseLine              int
-	PreventSurroundingPre bool
-	LinkableLines         bool
-	WorkerCount           int
-	KeepOrphanedFiles     bool
-	Lazy                  bool
+	FileName          string
+	FileWriter        FileWriterFunc
+	Path              string
+	Watch             bool
+	Style             string
+	TabWidth          int
+	Lines             bool
+	LinesTable        bool
+	BaseLine          int
+	LinkableLines     bool
+	WorkerCount       int
+	KeepOrphanedFiles bool
+	Lazy              bool
 }
 
 func Run(ctx context.Context, log *slog.Logger, args Arguments) (err error) {

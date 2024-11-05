@@ -52,25 +52,6 @@ func run(stdout, stderr io.Writer, args []string) (code int) {
 	return 64 // EX_USAGE
 }
 
-func newLogger(logLevel string, verbose bool, stderr io.Writer) *slog.Logger {
-	if verbose {
-		logLevel = "debug"
-	}
-	level := slog.LevelInfo.Level()
-	switch logLevel {
-	case "debug":
-		level = slog.LevelDebug.Level()
-	case "warn":
-		level = slog.LevelWarn.Level()
-	case "error":
-		level = slog.LevelError.Level()
-	}
-	return slog.New(sloghandler.NewHandler(stderr, &slog.HandlerOptions{
-		AddSource: logLevel == "debug",
-		Level:     level,
-	}))
-}
-
 const generateUsageText = `usage: snips generate [<args>...]
 
 Generates syntax highlighted templ components from code snippets.
@@ -87,32 +68,20 @@ Args:
     Set to true to watch the path for changes and regenerate code.
   -style
   	Style to use for formatting or path to an XML file to load.
-  -prefix
-  	HTML CSS class prefix
-  -all-styles
-  	Output all HTML CSS styles, including redundant ones.
-  -html-only
-  	Output HTML fragment.
-  -inline-styles
-  	Output HTML with inline CSS styles (no classes).
   -tab-width
   	Set the HTML tab width. (default 8)
   -line-numbers
   	Include line numbers in output.
   -line-numbers-table
   	Split line numbers and code in a HTML table.
-  -highlight
-  	Highlight these lines. N[:M][,...]
   -base-line
   	Base line number. (default 1)
-  -prevent-surrounding-pre
-  	Prevent the surrounding pre tag.
   -linkable-lines
   	Make the line numbers linkable and be a link to themselves.
   -lazy
-    Only generate .go files if the source .templ file is newer. // needed?
+    Only generate .go files if the source *.code.* file is newer. // needed?
   -keep-orphaned-files
-    Keeps orphaned generated templ files. (default false)
+    Keeps orphaned generated .go files. (default false)
   -v
     Set log verbosity level to "debug". (default "info")
   -log-level
@@ -132,16 +101,10 @@ func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 	toStdoutFlag := cmd.Bool("stdout", false, "")
 	watchFlag := cmd.Bool("watch", false, "")
 	styleFlag := cmd.String("style", "swapoff", "")
-	prefixFlag := cmd.String("prefix", "", "")
-	allStylesFlag := cmd.Bool("all-styles", false, "")
-	htmlOnlyFlag := cmd.Bool("html-only", false, "")
-	inlineStylesFlag := cmd.Bool("inline-styles", false, "")
 	tabWidthFlag := cmd.Int("tab-width", 8, "")
 	linesFlag := cmd.Bool("line-numbers", false, "")
 	linesTableFlag := cmd.Bool("line-numbers-table", false, "")
-	highlightFlag := cmd.String("highlight", "", "")
 	baseLineFlag := cmd.Int("base-line", 0, "")
-	preventSurroundingPreFlag := cmd.Bool("prevent-surrounding-pre", false, "")
 	linkableLinesFlag := cmd.Bool("linkable-lines", false, "")
 	workerCountFlag := cmd.Int("w", runtime.NumCPU(), "")
 	verboseFlag := cmd.Bool("v", false, "")
@@ -176,25 +139,19 @@ func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 	}
 
 	err = generatecmd.Run(ctx, log, generatecmd.Arguments{
-		FileName:              *fileNameFlag,
-		Path:                  *pathFlag,
-		FileWriter:            fw,
-		Watch:                 *watchFlag,
-		Style:                 *styleFlag,
-		Prefix:                *prefixFlag,
-		AllStyles:             *allStylesFlag,
-		HTMLOnly:              *htmlOnlyFlag,
-		InlineStyles:          *inlineStylesFlag,
-		TabWidth:              *tabWidthFlag,
-		Lines:                 *linesFlag,
-		LinesTable:            *linesTableFlag,
-		Highlight:             *highlightFlag,
-		BaseLine:              *baseLineFlag,
-		PreventSurroundingPre: *preventSurroundingPreFlag,
-		LinkableLines:         *linkableLinesFlag,
-		WorkerCount:           *workerCountFlag,
-		KeepOrphanedFiles:     *keepOrphanedFilesFlag,
-		Lazy:                  *lazyFlag,
+		FileName:          *fileNameFlag,
+		Path:              *pathFlag,
+		FileWriter:        fw,
+		Watch:             *watchFlag,
+		Style:             *styleFlag,
+		TabWidth:          *tabWidthFlag,
+		Lines:             *linesFlag,
+		LinesTable:        *linesTableFlag,
+		BaseLine:          *baseLineFlag,
+		LinkableLines:     *linkableLinesFlag,
+		WorkerCount:       *workerCountFlag,
+		KeepOrphanedFiles: *keepOrphanedFilesFlag,
+		Lazy:              *lazyFlag,
 	})
 	if err != nil {
 		color.New(color.FgRed).Fprint(stderr, "(✗) ")
@@ -202,4 +159,23 @@ func generateCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 1
 	}
 	return 0
+}
+
+func newLogger(logLevel string, verbose bool, stderr io.Writer) *slog.Logger {
+	if verbose {
+		logLevel = "debug"
+	}
+	level := slog.LevelInfo.Level()
+	switch logLevel {
+	case "debug":
+		level = slog.LevelDebug.Level()
+	case "warn":
+		level = slog.LevelWarn.Level()
+	case "error":
+		level = slog.LevelError.Level()
+	}
+	return slog.New(sloghandler.NewHandler(stderr, &slog.HandlerOptions{
+		AddSource: logLevel == "debug",
+		Level:     level,
+	}))
 }
