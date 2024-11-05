@@ -1,13 +1,16 @@
 package generator
 
 import (
+	"bytes"
 	"io"
-	"path/filepath"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters/html"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 )
 
 type GenerateOpt func(g *generator) error
@@ -24,18 +27,6 @@ func WithVersion(v string) GenerateOpt {
 func WithTimestamp(d time.Time) GenerateOpt {
 	return func(g *generator) error {
 		g.generatedDate = d.Format(time.RFC3339)
-		return nil
-	}
-}
-
-// WithFileName sets the filename of the templ file in template rendering error messages.
-func WithFileName(name string) GenerateOpt {
-	return func(g *generator) error {
-		if filepath.IsAbs(name) {
-			_, g.fileName = filepath.Split(name)
-			return nil
-		}
-		g.fileName = name
 		return nil
 	}
 }
@@ -57,14 +48,20 @@ type generator struct {
 	version string
 	// generatedDate to include as a comment.
 	generatedDate string
-	// fileName to include as a comment.
-	fileName string
+	// packageName to use in the generated code.
+	packageName string
+	// componentName to use in the generated code.
+	componentName string
+	og            string
 }
 
-func Generate(w io.Writer, htmlOpts []html.Option, opts ...GenerateOpt) (literals string, err error) {
+func Generate(w io.Writer, htmlOpts []html.Option, path string, packageName string, componentName string, opts ...GenerateOpt) (literals string, err error) {
 	g := generator{
-		f: html.New(htmlOpts...),
-		w: NewRangeWriter(w),
+		f:             html.New(htmlOpts...),
+		w:             NewRangeWriter(w),
+		packageName:   packageName,
+		componentName: componentName,
+		og:            path,
 	}
 
 	for _, opt := range opts {
@@ -89,6 +86,15 @@ func (g *generator) generate() (err error) {
 		return
 	}
 	if err = g.writePackage(); err != nil {
+		return
+	}
+	if err = g.writeImports(); err != nil {
+		return
+	}
+	if err = g.writFoo(); err != nil {
+		return
+	}
+	if err = g.writeBlankAssignmentForRuntimeImport(); err != nil {
 		return
 	}
 
@@ -117,8 +123,187 @@ func (g *generator) writeGeneratedDateComment() (err error) {
 	return err
 }
 
-func (g *generator) writePackage() error {
-	// package ...
-	_, err := g.w.Write("package snips")
+func (g *generator) writePackage() (err error) {
+	if _, err := g.w.Write("package " + g.packageName + "\n\n"); err != nil {
+		return err
+	}
+	if _, err = g.w.Write("//lint:file-ignore SA4006 This context is only used if a nested component is present.\n\n"); err != nil {
+		return err
+	}
 	return err
+}
+
+func (g *generator) writeImports() error {
+	var err error
+	// Always import templ because it's the interface type of all templates.
+	if _, err = g.w.Write("import \"github.com/a-h/templ\"\n"); err != nil {
+		return err
+	}
+	if _, err = g.w.Write("import templruntime \"github.com/a-h/templ/runtime\"\n"); err != nil {
+		return err
+	}
+	if _, err = g.w.Write("\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *generator) writFoo() (err error) {
+	if _, err = g.w.Write("func " + g.componentName + "() templ.Component {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\treturn templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\ttempl_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\tif templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\treturn templ_7745c5c3_CtxErr\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t}\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\ttempl_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\tif !templ_7745c5c3_IsBuffer {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\tdefer func() {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\t\ttempl_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\t\tif templ_7745c5c3_Err == nil {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\t\t\ttempl_7745c5c3_Err = templ_7745c5c3_BufErr\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\t\t}\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\t}()\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t}\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\tctx = templ.InitializeContext(ctx)\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\ttempl_7745c5c3_Var1 := templ.GetChildren(ctx)\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\tif templ_7745c5c3_Var1 == nil {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\ttempl_7745c5c3_Var1 = templ.NopComponent\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t}\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\tctx = templ.ClearChildren(ctx)\n"); err != nil {
+		return
+	}
+	// MARK
+	f, err := os.ReadFile(g.og)
+	contents, err := io.ReadAll(bytes.NewReader(f))
+	lexer := lexers.Analyse(string(contents))
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+	lexer = chroma.Coalesce(lexer)
+	formatter := html.New()
+	style := styles.Get("monkokailight")
+	if style == nil {
+		style = styles.Fallback
+	}
+	iterator, err := lexer.Tokenise(nil, string(contents))
+	var b bytes.Buffer
+	err = formatter.Format(&b, style, iterator)
+	if err != nil {
+		return err
+	}
+
+	formattedHTML := strings.ReplaceAll(b.String(), `"`, `\"`)
+	formattedHTML = strings.ReplaceAll(formattedHTML, "\n", "\\n")
+
+	if _, err = g.w.Write("\t\t_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(\"" + formattedHTML + "\")\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\tif templ_7745c5c3_Err != nil {\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t\treturn templ_7745c5c3_Err\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\t}\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t\treturn templ_7745c5c3_Err\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("\t})\n"); err != nil {
+		return
+	}
+	if _, err = g.w.Write("}\n"); err != nil {
+		return
+	}
+	return nil
+}
+
+func (g *generator) writeComponent() (err error) {
+	if _, err = g.w.Write("templ " + g.componentName + "() {\n"); err != nil {
+		return
+	}
+
+	f, err := os.ReadFile(g.og)
+	contents, err := io.ReadAll(bytes.NewReader(f))
+	lexer := lexers.Analyse(string(contents))
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+	lexer = chroma.Coalesce(lexer)
+	formatter := html.New(html.PreventSurroundingPre(true), html.InlineCode(true))
+	style := styles.Get("monkokailight")
+	if style == nil {
+		style = styles.Fallback
+	}
+	iterator, err := lexer.Tokenise(nil, string(contents))
+	var b bytes.Buffer
+	err = formatter.Format(&b, style, iterator)
+	if err != nil {
+		return err
+	}
+	// if _, err = g.w.Write("<pre> {`\n" + b.String() + "\n`}</pre>"); err != nil {
+
+	if _, err = g.w.Write(b.String()); err != nil {
+		return err
+	}
+	if _, err = g.w.Write("\n"); err != nil {
+		return err
+	}
+
+	if _, err := g.w.Write("}\n"); err != nil {
+		return err
+	}
+	return err
+}
+
+// writeBlankAssignmentForRuntimeImport writes out a blank identifier assignment.
+// This ensures that even if the github.com/a-h/templ/runtime package is not used in the generated code,
+// the Go compiler will not complain about the unused import.
+func (g *generator) writeBlankAssignmentForRuntimeImport() error {
+	var err error
+	if _, err = g.w.Write("var _ = templruntime.GeneratedTemplate"); err != nil {
+		return err
+	}
+	return nil
 }

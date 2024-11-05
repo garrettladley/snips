@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"go/format"
 	"io"
 	"log/slog"
 	"os"
@@ -14,6 +13,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+
+	"github.com/a-h/templ/cmd/templ/imports"
+	parser "github.com/a-h/templ/parser/v2"
 
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/fsnotify/fsnotify"
@@ -175,54 +178,104 @@ func (h *FSEventHandler) UpsertHash(fileName string, hash [sha256.Size]byte) (up
 // generate Go code for a single template.
 // If a basePath is provided, the filename included in error messages is relative to it.
 func (h *FSEventHandler) generate(fileName string) (goUpdated, textUpdated bool, err error) {
-	fmt.Println(fileName, snips.PackageName(fileName))
+	og := fileName
+	fileName = stripCode(fileName)
+	targetFileName := fileName + "_templ.go"
 
-	// remove .code. from the filename
-	targetFileName := fileName + ".templ"
+	parts := strings.Split(filepath.ToSlash(fileName), "/")
+	if len(parts) == 0 {
+		return false, false, fmt.Errorf("unexpected file name %q", fileName)
+	}
 
-	// Only use relative filenames to the basepath for filenames in runtime error messages.
-	absFilePath, err := filepath.Abs(fileName)
-	if err != nil {
-		return false, false, fmt.Errorf("failed to get absolute path for %q: %w", fileName, err)
-	}
-	relFilePath, err := filepath.Rel(h.dir, absFilePath)
-	if err != nil {
-		return false, false, fmt.Errorf("failed to get relative path for %q: %w", fileName, err)
-	}
-	// Convert Windows file paths to Unix-style for consistency.
-	relFilePath = filepath.ToSlash(relFilePath)
+	fileName = sanitzeFileName(parts[len(parts)-1])
+	dir := strings.Join(parts[:len(parts)-1], "/")
 
 	var b bytes.Buffer
-	literals, err := generator.Generate(&b, h.genOpts, generator.WithFileName(relFilePath))
+	_, err = generator.Generate(&b, h.genOpts, og, snips.PackageName(dir), fileName)
 	if err != nil {
 		return false, false, fmt.Errorf("%s generation error: %w", fileName, err)
 	}
+	formattedCode := b.Bytes()
+	// formattedCode, _, err := format(b.String(), false)
+	// if err != nil {
+	// 	return false, false, fmt.Errorf("% source formatting error %w", fileName, err)
+	// }
 
-	formattedGoCode, err := format.Source(b.Bytes())
-	if err != nil {
-		return false, false, fmt.Errorf("% source formatting error %w", fileName, err)
-	}
-
-	// Hash output, and write out the file if the goCodeHash has changed.
-	goCodeHash := sha256.Sum256(formattedGoCode)
-	if h.UpsertHash(targetFileName, goCodeHash) {
+	// Hash output, and write out the file if the codeHash has changed.
+	codeHash := sha256.Sum256(formattedCode)
+	if h.UpsertHash(targetFileName, codeHash) {
 		goUpdated = true
-		if err = h.writer(targetFileName, formattedGoCode); err != nil {
+		if err = h.writer(targetFileName, formattedCode); err != nil {
 			return false, false, fmt.Errorf("failed to write target file %q: %w", targetFileName, err)
 		}
 	}
 
-	// Add the txt file if it has changed.
-	if len(literals) > 0 {
-		txtFileName := "_code.txt"
-		txtHash := sha256.Sum256([]byte(literals))
-		if h.UpsertHash(txtFileName, txtHash) {
-			textUpdated = true
-			if err = os.WriteFile(txtFileName, []byte(literals), 0o644); err != nil {
-				return false, false, fmt.Errorf("failed to write string literal file %q: %w", txtFileName, err)
-			}
-		}
-	}
+	// // Add the txt file if it has changed.
+	// if len(literals) > 0 {
+	// 	txtFileName := "_code.txt"
+	// 	txtHash := sha256.Sum256([]byte(literals))
+	// 	if h.UpsertHash(txtFileName, txtHash) {
+	// 		textUpdated = true
+	// 		if err = os.WriteFile(txtFileName, []byte(literals), 0o644); err != nil {
+	// 			return false, false, fmt.Errorf("failed to write string literal file %q: %w", txtFileName, err)
+	// 		}
+	// 	}
+	// }
 
 	return goUpdated, textUpdated, err
+}
+
+func stripCode(fileName string) string {
+	parts := strings.Split(fileName, ".code")
+	if len(parts) != 2 {
+		return fileName
+	}
+	return parts[0] + parts[1]
+}
+
+func sanitzeFileName(fileName string) string {
+	var result []rune
+	firstLetter := true
+	for _, char := range fileName {
+		if char == ' ' {
+			firstLetter = true
+			continue
+		}
+
+		if unicode.IsLetter(char) || unicode.IsDigit(char) {
+			if firstLetter {
+				result = append(result, unicode.ToUpper(char))
+				firstLetter = false
+			} else {
+				result = append(result, char)
+			}
+		} else {
+			firstLetter = true
+		}
+	}
+	return string(result)
+}
+
+func format(src string, writeIfUnchanged bool) (res []byte, fileChanged bool, err error) {
+	t, err := parser.ParseString(src)
+	if err != nil {
+		return nil, false, err
+	}
+	t.Filepath = ""
+	t, err = imports.Process(t)
+	if err != nil {
+		return nil, false, err
+	}
+	w := new(bytes.Buffer)
+	if err = t.Write(w); err != nil {
+		return nil, false, fmt.Errorf("formatting error: %w", err)
+	}
+
+	fileChanged = (src != w.String())
+
+	if !writeIfUnchanged && !fileChanged {
+		return nil, fileChanged, nil
+	}
+
+	return w.Bytes(), fileChanged, nil
 }

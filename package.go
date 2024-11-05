@@ -44,5 +44,5 @@ func fallback(dir string) (name string) {
 		return parts[n-1]
 	}
 
-	return ""
+	return "main"
 }

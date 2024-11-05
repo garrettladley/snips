@@ -32,7 +32,7 @@ func TestPackageNameDifferentFromDirectory(t *testing.T) {
 
 func TestPackageNameFallback(t *testing.T) {
 	dir := createTempDir(t)
-	filePath := filepath.Join(dir, "views", "foo", "ex.rs")
+	filePath := filepath.Join(dir, "views", "foo", "ex.code.rs")
 	createTempFile(t, filePath, "fn main() {\n    println!(\"Hello World!\");\n}")
 
 	pkg := snips.PackageName(filepath.Join(dir, "views", "foo"))
