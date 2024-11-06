@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/fsnotify/fsnotify"
@@ -175,12 +176,24 @@ func (h *FSEventHandler) UpsertHash(fileName string, hash [sha256.Size]byte) (up
 // generate Go code for a single template.
 // If a basePath is provided, the filename included in error messages is relative to it.
 func (h *FSEventHandler) generate(fileName string) (goUpdated, textUpdated bool, err error) {
+	pc, err := from(fileName)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to parse path %q: %w", fileName, err)
+	}
+
+	f, err := os.ReadFile(fileName)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to open %q: %w", fileName, err)
+	}
+
 	var b bytes.Buffer
 	literals, err := generator.Generate(&b,
 		generator.Config{
-			Path:     fileName,
-			HTMLOpts: h.genOpts,
-			Style:    "", // TODO: drill down
+			HTMLOpts:      h.genOpts,
+			Style:         "", // TODO: drill down
+			Contents:      f,
+			PackageName:   pc.packageName,
+			ComponentName: pc.componentName,
 		})
 	if err != nil {
 		return false, false, fmt.Errorf("%s generation error: %w", fileName, err)
@@ -214,4 +227,52 @@ func (h *FSEventHandler) generate(fileName string) (goUpdated, textUpdated bool,
 	}
 
 	return goUpdated, textUpdated, err
+}
+
+type packageComponent struct {
+	packageName   string
+	componentName string
+}
+
+func from(fileName string) (pc packageComponent, err error) {
+	fileName = stripCode(fileName)
+	parts := strings.Split(filepath.ToSlash(fileName), "/")
+	if len(parts) == 0 {
+		return pc, fmt.Errorf("unexpected file name %q", fileName)
+	}
+
+	pc.componentName = sanitze(parts[len(parts)-1])
+	pc.packageName = snips.PackageName(strings.Join(parts[:len(parts)-1], "/"))
+	return
+}
+
+func stripCode(fileName string) string {
+	parts := strings.Split(fileName, ".code")
+	if len(parts) != 2 {
+		return fileName
+	}
+	return parts[0] + parts[1]
+}
+
+func sanitze(fileName string) string {
+	var result []rune
+	firstLetter := true
+	for _, char := range fileName {
+		if char == ' ' {
+			firstLetter = true
+			continue
+		}
+
+		if unicode.IsLetter(char) || unicode.IsDigit(char) {
+			if firstLetter {
+				result = append(result, unicode.ToUpper(char))
+				firstLetter = false
+			} else {
+				result = append(result, char)
+			}
+		} else {
+			firstLetter = true
+		}
+	}
+	return string(result)
 }

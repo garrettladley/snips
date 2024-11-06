@@ -2,19 +2,14 @@ package generator
 
 import (
 	"bytes"
-	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/garrettladley/snips"
 )
 
 type GenerateOpt func(g *generator) error
@@ -64,8 +59,8 @@ type generator struct {
 	generatedDate string
 	// style to use for the generated HTML.
 	style string
-	// the path to the original file.
-	path string
+	// the contents to be syntax highlighted.
+	contents []byte
 	// packageName to use in the generated code.
 	packageName string
 	// componentName to use in the generated code.
@@ -75,23 +70,22 @@ type generator struct {
 }
 
 type Config struct {
-	Path     string
-	HTMLOpts []html.Option
-	Style    string
+	HTMLOpts      []html.Option
+	Style         string
+	Contents      []byte
+	PackageName   string
+	ComponentName string
 }
 
 func Generate(w io.Writer, config Config, opts ...GenerateOpt) (literals string, err error) {
-	pc, err := from(config.Path)
-	if err != nil {
-		return "", err
-	}
 
 	g := generator{
 		f:             html.New(config.HTMLOpts...),
 		w:             NewRangeWriter(w),
-		packageName:   pc.packageName,
-		componentName: pc.componentName,
-		path:          config.Path,
+		style:         config.Style,
+		contents:      config.Contents,
+		packageName:   config.PackageName,
+		componentName: config.ComponentName,
 	}
 
 	for _, opt := range opts {
@@ -278,12 +272,7 @@ func (g *generator) writeComponent() (err error) {
 }
 
 func (g *generator) chroma() (s string, err error) {
-	f, err := os.ReadFile(g.path)
-	if err != nil {
-		return s, err
-	}
-
-	contents, err := io.ReadAll(bytes.NewReader(f))
+	contents, err := io.ReadAll(bytes.NewReader(g.contents))
 	if err != nil {
 		return s, err
 	}
@@ -321,52 +310,4 @@ func (g *generator) writeBlankAssignmentForRuntimeImport() error {
 		return err
 	}
 	return nil
-}
-
-type packageComponent struct {
-	packageName   string
-	componentName string
-}
-
-func from(path string) (pc packageComponent, err error) {
-	path = stripCode(path)
-	parts := strings.Split(filepath.ToSlash(path), "/")
-	if len(parts) == 0 {
-		return pc, fmt.Errorf("unexpected file name %q", path)
-	}
-
-	pc.componentName = sanitze(parts[len(parts)-1])
-	pc.packageName = snips.PackageName(strings.Join(parts[:len(parts)-1], "/"))
-	return
-}
-
-func stripCode(fileName string) string {
-	parts := strings.Split(fileName, ".code")
-	if len(parts) != 2 {
-		return fileName
-	}
-	return parts[0] + parts[1]
-}
-
-func sanitze(fileName string) string {
-	var result []rune
-	firstLetter := true
-	for _, char := range fileName {
-		if char == ' ' {
-			firstLetter = true
-			continue
-		}
-
-		if unicode.IsLetter(char) || unicode.IsDigit(char) {
-			if firstLetter {
-				result = append(result, unicode.ToUpper(char))
-				firstLetter = false
-			} else {
-				result = append(result, char)
-			}
-		} else {
-			firstLetter = true
-		}
-	}
-	return string(result)
 }
